@@ -7,17 +7,46 @@ import {
   TextInput,
   TouchableOpacity,
   Alert,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
+  Image,
+  Modal,
 } from 'react-native';
+import Svg, { Path, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { StatusBar } from 'expo-status-bar';
+import { 
+  BrandColors, 
+  CourseColors, 
+  NeutralColors, 
+  TextColors, 
+  BackgroundColors,
+  Shadow,
+  Spacing,
+  BorderRadius,
+  Typography,
+  DeviceType,
+  ContainerWidth,
+  moderateScale
+} from '@/constants/theme';
+
+
+
+// Logo imports using require for better compatibility
+const iMathsLogo = require('@/assets/images/imaths-logo.png');
+const ucmasLogo = require('@/assets/images/ucmas-logo.png');
+const obotzLogo = require('@/assets/images/obotz-logo.png');
+
+
+
+interface Child {
+  id: string;
+  name: string;
+  age: string;
+  selectedCourse: 'imaths' | 'ucmas' | 'obotz' | '';
+}
 
 interface FormData {
-  child1Name: string;
-  child1Age: string;
-  child2Name: string;
-  child2Age: string;
+  children: Child[];
   parentName: string;
   contactNumber: string;
   email: string;
@@ -27,10 +56,7 @@ interface FormData {
 
 export default function EnquiryFormScreen() {
   const [formData, setFormData] = useState<FormData>({
-    child1Name: '',
-    child1Age: '',
-    child2Name: '',
-    child2Age: '',
+    children: [{ id: '1', name: '', age: '', selectedCourse: '' }],
     parentName: '',
     contactNumber: '',
     email: '',
@@ -38,7 +64,64 @@ export default function EnquiryFormScreen() {
     todaysDate: new Date().toLocaleDateString(),
   });
 
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedCourseInfo, setSelectedCourseInfo] = useState<string>('');
+  const [prevPhoneLength, setPrevPhoneLength] = useState(0);
+
+  const addChild = () => {
+    if (formData.children.length < 5) {
+      const newChild: Child = {
+        id: Date.now().toString(),
+        name: '',
+        age: '',
+        selectedCourse: '',
+      };
+      setFormData(prev => ({
+        ...prev,
+        children: [...prev.children, newChild],
+      }));
+    }
+  };
+
+  const removeChild = (childId: string) => {
+    if (formData.children.length > 1) {
+      setFormData(prev => ({
+        ...prev,
+        children: prev.children.filter(child => child.id !== childId),
+      }));
+    }
+  };
+
+  const updateChild = (childId: string, field: keyof Child, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      children: prev.children.map(child =>
+        child.id === childId ? { ...child, [field]: value } : child
+      ),
+    }));
+  };
+
+  const formatPhoneNumber = (value: string, isDeleting: boolean): string => {
+
+    if (isDeleting && value.length === 3) {
+        return `${value.slice(0, 2)}`;
+    } else if (isDeleting && value.length === 7) {
+      return `${value.slice(0, 6)}`;
+    } else if(value.length === 3 || value.length === 7) {
+      return `${value}-`;
+    } 
+    return value
+  };
+
   const handleInputChange = (field: keyof FormData, value: string | boolean) => {
+    // Auto-format phone number
+    if (field === 'contactNumber' && typeof value === 'string') {
+
+      const isDeleting = value.length < prevPhoneLength;
+      value = formatPhoneNumber(value, isDeleting);
+      setPrevPhoneLength(value.length);
+    }
+    
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -46,31 +129,92 @@ export default function EnquiryFormScreen() {
   };
 
   const handleSubmit = () => {
-    // Basic validation
-    if (!formData.child1Name || !formData.parentName || !formData.contactNumber) {
-      Alert.alert('Error', 'Please fill in all required fields');
+    // Enhanced validation
+    const hasValidChild = formData.children.some(child => child.name.trim() && child.age.trim() && child.selectedCourse);
+    
+    if (!hasValidChild) {
+      Alert.alert('Validation Error', 'Please add at least one child with name, age, and course selection');
+      return;
+    }
+    
+    if (!formData.parentName.trim()) {
+      Alert.alert('Validation Error', 'Please enter parent name');
+      return;
+    }
+    
+    if (!formData.contactNumber.trim()) {
+      Alert.alert('Validation Error', 'Please enter contact number');
       return;
     }
     
     if (!formData.consent) {
-      Alert.alert('Error', 'Please provide consent to continue');
+      Alert.alert('Validation Error', 'Please provide consent to continue');
       return;
     }
 
-    Alert.alert('Success', 'Enquiry submitted successfully!');
+    Alert.alert('Success', 'Enquiry submitted successfully!', [
+      { text: 'OK', onPress: () => console.log('Form submitted:', formData) }
+    ]);
+  };
+
+  const getCourseColor = (course: string) => {
+    switch (course) {
+      case 'imaths': return CourseColors.imaths;
+      case 'ucmas': return CourseColors.ucmas;
+      case 'obotz': return CourseColors.obotz;
+      default: return NeutralColors.gray400;
+    }
+  };
+
+  const getCourseName = (course: string) => {
+    switch (course) {
+      case 'imaths': return 'i-Maths';
+      case 'ucmas': return 'UCMAS';
+      case 'obotz': return 'OBOTZ';
+      default: return 'Select Course';
+    }
+  };
+
+  const getCourseLogo = (course: string) => {
+    switch (course) {
+      case 'imaths': return iMathsLogo;
+      case 'ucmas': return ucmasLogo;
+      case 'obotz': return obotzLogo;
+      default: return null;
+    }
+  };
+
+  const getCourseInfo = (course: string) => {
+    switch (course) {
+      case 'imaths': 
+        return 'i-Maths is an Early Math Enrichment Program designed for children aged 4-7 years. It focuses on building strong mathematical foundations through interactive and engaging activities that make learning math fun and effective.';
+      case 'ucmas': 
+        return 'UCMAS (Universal Concept of Mental Arithmetic System) is an abacus-based mental math program for children aged 7-13 years. It enhances concentration, memory, and calculation skills through systematic training with the abacus.';
+      case 'obotz': 
+        return 'OBOTZ is an AI Robotics & Coding Program designed for children aged 8-18 years. It introduces students to programming, robotics, and artificial intelligence through hands-on projects and interactive learning experiences.';
+      default: return '';
+    }
+  };
+
+  const showCourseInfo = (course: string) => {
+    setSelectedCourseInfo(getCourseInfo(course));
+    setModalVisible(true);
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="light" backgroundColor="#2E7D32" />
+    <View style={styles.container}>
+      <StatusBar style="light" backgroundColor={BrandColors.primary} />
+    {/*  <CurvedBackground /> */}
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-          {/* Header */}
+          {/* Header - Matching Original Form */}
           <View style={styles.header}>
-            <Text style={styles.headerTitle}>ENQUIRY FORM</Text>
+            <View style={styles.headerContent}>
+              <Text style={styles.headerTitle}>ENQUIRY FORM</Text>
+            </View>
             <View style={styles.dateContainer}>
               <Text style={styles.dateLabel}>Today's Date</Text>
               <View style={styles.dateBox}>
@@ -83,93 +227,136 @@ export default function EnquiryFormScreen() {
           <View style={styles.formContainer}>
             {/* Children Information */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Name of the Child</Text>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Children Information</Text>
+                <Text style={styles.sectionSubtitle}>Add up to 5 children</Text>
+              </View>
               
-              <View style={styles.childRow}>
-                <Text style={styles.childLabel}>Child 1</Text>
-                <View style={styles.childInputContainer}>
-                  <TextInput
-                    style={styles.childNameInput}
-                    value={formData.child1Name}
-                    onChangeText={(value) => handleInputChange('child1Name', value)}
-                    placeholder="Enter child's name"
-                    placeholderTextColor="#999"
-                  />
-                  <View style={styles.ageContainer}>
-                    <Text style={styles.ageLabel}>Age</Text>
-                    <TextInput
-                      style={styles.ageInput}
-                      value={formData.child1Age}
-                      onChangeText={(value) => handleInputChange('child1Age', value)}
-                      placeholder="Age"
-                      placeholderTextColor="#999"
-                      keyboardType="numeric"
-                      maxLength={2}
-                    />
+              {formData.children.map((child, index) => (
+                <View key={child.id} style={styles.childCard}>
+                  <View style={styles.childHeader}>
+                    <Text style={styles.childNumber}>Child {index + 1}</Text>
+                    {formData.children.length > 1 && (
+                      <TouchableOpacity
+                        style={styles.removeButton}
+                        onPress={() => removeChild(child.id)}
+                      >
+                        <Text style={styles.removeButtonText}>×</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
-                </View>
-              </View>
+                  
+                  <View style={styles.childInputRow}>
+                    <View style={styles.nameInputContainer}>
+                      <Text style={styles.inputLabel}>Name <Text style={styles.requiredAsterisk}>*</Text></Text>
+                      <TextInput
+                        style={styles.childNameInput}
+                        value={child.name}
+                        onChangeText={(value) => updateChild(child.id, 'name', value)}
+                        placeholder="Enter child's name"
+                        placeholderTextColor={NeutralColors.gray500}
+                      />
+                    </View>
+                    <View style={styles.ageInputContainer}>
+                      <Text style={styles.inputLabel}>Age <Text style={styles.requiredAsterisk}>*</Text></Text>
+                      <TextInput
+                        style={styles.ageInput}
+                        value={child.age}
+                        onChangeText={(value) => updateChild(child.id, 'age', value)}
+                        placeholder="Age"
+                        placeholderTextColor={NeutralColors.gray500}
+                        keyboardType="numeric"
+                        maxLength={2}
+                      />
+                    </View>
+                  </View>
 
-              <View style={styles.childRow}>
-                <Text style={styles.childLabel}>Child 2</Text>
-                <View style={styles.childInputContainer}>
-                  <TextInput
-                    style={styles.childNameInput}
-                    value={formData.child2Name}
-                    onChangeText={(value) => handleInputChange('child2Name', value)}
-                    placeholder="Enter child's name (optional)"
-                    placeholderTextColor="#999"
-                  />
-                  <View style={styles.ageContainer}>
-                    <Text style={styles.ageLabel}>Age</Text>
-                    <TextInput
-                      style={styles.ageInput}
-                      value={formData.child2Age}
-                      onChangeText={(value) => handleInputChange('child2Age', value)}
-                      placeholder="Age"
-                      placeholderTextColor="#999"
-                      keyboardType="numeric"
-                      maxLength={2}
-                    />
+                  {/* Course Selection */}
+                  <View style={styles.courseSection}>
+                    <View style={styles.courseSectionHeader}>
+                      <Text style={styles.inputLabel}>Select Course <Text style={styles.requiredAsterisk}>*</Text></Text>
+                    </View>
+                    <View style={styles.courseOptions}>
+                      {['imaths', 'ucmas', 'obotz'].map((course) => (
+                        <View key={course} style={styles.courseOptionContainer}>
+                          <TouchableOpacity
+                            style={[
+                              styles.courseOption,
+                              child.selectedCourse === course && {
+                                backgroundColor: getCourseColor(course),
+                                borderColor: getCourseColor(course),
+                              }
+                            ]}
+                            onPress={() => updateChild(child.id, 'selectedCourse', course)}
+                          >
+                            <Image source={getCourseLogo(course)} style={styles.courseLogoSmall} />
+                            <Text style={[
+                              styles.courseOptionText,
+                              child.selectedCourse === course && styles.courseOptionTextSelected
+                            ]}>
+                              {getCourseName(course)}
+                            </Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.infoButton}
+                            onPress={() => showCourseInfo(course)}
+                          >
+                            <Text style={styles.infoButtonText}>i</Text>
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                    </View>
                   </View>
                 </View>
-              </View>
+              ))}
+
+              {/* Add Child Button */}
+              {formData.children.length < 5 && (
+                <TouchableOpacity style={styles.addChildButton} onPress={addChild}>
+                  <Text style={styles.addChildButtonText}>+ Add Another Child</Text>
+                </TouchableOpacity>
+              )}
             </View>
 
             {/* Parent Information */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Name of the Parent</Text>
-              <TextInput
-                style={styles.fullWidthInput}
-                value={formData.parentName}
-                onChangeText={(value) => handleInputChange('parentName', value)}
-                placeholder="Enter parent's name"
-                placeholderTextColor="#999"
-              />
+              <Text style={styles.sectionTitle}>Parent Information</Text>
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>Parent Name <Text style={styles.requiredAsterisk}>*</Text></Text>
+                <TextInput
+                  style={styles.fullWidthInput}
+                  value={formData.parentName}
+                  onChangeText={(value) => handleInputChange('parentName', value)}
+                  placeholder="Enter parent's full name"
+                  placeholderTextColor={NeutralColors.gray500}
+                />
+              </View>
             </View>
 
             {/* Contact Information */}
             <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Contact Information</Text>
               <View style={styles.contactRow}>
                 <View style={styles.contactField}>
-                  <Text style={styles.sectionTitle}>Contact no. (Mobile)</Text>
+                  <Text style={styles.inputLabel}>Mobile Number <Text style={styles.requiredAsterisk}>*</Text></Text>
                   <TextInput
                     style={styles.contactInput}
                     value={formData.contactNumber}
                     onChangeText={(value) => handleInputChange('contactNumber', value)}
-                    placeholder="Enter mobile number"
-                    placeholderTextColor="#999"
-                    keyboardType="phone-pad"
+                    placeholder="XXX-XXX-XXXX"
+                    placeholderTextColor={NeutralColors.gray500}
+                    keyboardType="number-pad"
+                    maxLength={12}
                   />
                 </View>
                 <View style={styles.contactField}>
-                  <Text style={styles.sectionTitle}>Email ID</Text>
+                  <Text style={styles.inputLabel}>Email Address</Text>
                   <TextInput
                     style={styles.contactInput}
                     value={formData.email}
                     onChangeText={(value) => handleInputChange('email', value)}
                     placeholder="Enter email address"
-                    placeholderTextColor="#999"
+                    placeholderTextColor={NeutralColors.gray500}
                     keyboardType="email-address"
                     autoCapitalize="none"
                   />
@@ -187,45 +374,9 @@ export default function EnquiryFormScreen() {
                   {formData.consent && <Text style={styles.checkmark}>✓</Text>}
                 </View>
                 <Text style={styles.consentText}>
-                  I hereby give my consent to UCMAS Bantwani to send me information regarding free trial classes, new batch start dates, and other relevant updates pertaining to the UCMAS, i-Maths and Robotics program. I understand that this information will be communicated through email, text messages, or phone calls.
+                  I hereby give my consent to UCMAS Bantwani to send me information regarding free trial classes, new batch start dates, and other relevant updates pertaining to the UCMAS, i-Maths and OBOTZ programs. I understand that this information will be communicated through email, text messages, or phone calls.
                 </Text>
               </TouchableOpacity>
-            </View>
-
-            {/* Program Information */}
-            <View style={styles.programSection}>
-              <View style={styles.programCard}>
-                <View style={styles.programHeader}>
-                  <Text style={styles.iMathsTitle}>i-Maths</Text>
-                  <Text style={styles.programSubtitle}>Early Math Enrichment Program</Text>
-                  <Text style={styles.ageRange}>Age 4-7 yrs</Text>
-                </View>
-              </View>
-
-              <View style={styles.programCard}>
-                <View style={styles.ucmasHeader}>
-                  <View style={styles.ucmasLogo}>
-                    <Text style={styles.ucmasLogoText}>20</Text>
-                    <Text style={styles.ucmasYears}>YEARS OF</Text>
-                    <Text style={styles.ucmasEmpowering}>EMPOWERING</Text>
-                    <Text style={styles.ucmasMinds}>YOUNG MINDS</Text>
-                  </View>
-                  <View style={styles.ucmasInfo}>
-                    <Text style={styles.ucmasTitle}>UCMAS</Text>
-                    <Text style={styles.ucmasSubtitle}>EDUCATION WITH A DIFFERENCE</Text>
-                    <Text style={styles.ucmasProgram}>Abacus-based Mental Math Program</Text>
-                    <Text style={styles.ageRange}>Age 7-13 yrs</Text>
-                  </View>
-                </View>
-              </View>
-
-              <View style={styles.programCard}>
-                <View style={styles.programHeader}>
-                  <Text style={styles.codingTitle}>GoZ</Text>
-                  <Text style={styles.programSubtitle}>AI Robotics & Coding Program</Text>
-                  <Text style={styles.ageRange}>Age 8-18 yrs</Text>
-                </View>
-              </View>
             </View>
 
             {/* Submit Button */}
@@ -235,266 +386,401 @@ export default function EnquiryFormScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+
+      {/* Course Information Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Course Information</Text>
+              <TouchableOpacity
+                style={styles.modalCloseButton}
+                onPress={() => setModalVisible(false)}
+              >
+                <Text style={styles.modalCloseText}>×</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.modalText}>{selectedCourseInfo}</Text>
+
+          </View>
+        </View>
+      </Modal>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: NeutralColors.cream,
+  },
+  backgroundContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 0,
+  },
+  curvedSvg: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
   },
   keyboardView: {
     flex: 1,
+    zIndex: 1,
   },
   scrollView: {
     flex: 1,
   },
   header: {
-    backgroundColor: '#2E7D32',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
+    backgroundColor: BrandColors.primary,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  headerContent: {
+    flex: 1,
+  },
   headerTitle: {
-    color: '#FFD700',
-    fontSize: 18,
+    fontSize: moderateScale(16), // Reduced from 20
     fontWeight: 'bold',
+    color: TextColors.gold,
+    letterSpacing: 0.8,
   },
   dateContainer: {
     alignItems: 'center',
   },
   dateLabel: {
-    color: 'white',
-    fontSize: 12,
-    marginBottom: 5,
+    ...Typography.caption,
+    color: TextColors.inverse,
+    marginBottom: Spacing.sm,
   },
   dateBox: {
-    backgroundColor: 'white',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 4,
+    backgroundColor: BackgroundColors.primary,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.sm,
     minWidth: 80,
+    ...Shadow.small,
   },
   dateText: {
-    color: '#333',
-    fontSize: 12,
+    ...Typography.caption,
+    color: TextColors.primary,
     textAlign: 'center',
+    fontWeight: '600',
   },
   formContainer: {
-    padding: 20,
+    backgroundColor: 'transparent',
+    padding: Spacing.md,
+    maxWidth: ContainerWidth.maxWidth,
+    alignSelf: 'center',
+    width: '100%',
   },
   section: {
-    marginBottom: 20,
+    marginBottom: Spacing.lg,
+  },
+  sectionHeader: {
+    marginBottom: Spacing.md,
   },
   sectionTitle: {
-    fontSize: 14,
+    fontSize: moderateScale(16), // Reduced from h5
+    color: TextColors.primary,
+    marginBottom: Spacing.sm,
     fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
   },
-  childRow: {
-    marginBottom: 15,
+  sectionSubtitle: {
+    fontSize: moderateScale(12), // Reduced from body2
+    color: TextColors.secondary,
   },
-  childLabel: {
-    fontSize: 14,
-    color: '#333',
-    marginBottom: 8,
+  inputContainer: {
+    marginBottom: Spacing.sm,
   },
-  childInputContainer: {
+  inputLabel: {
+    fontSize: moderateScale(13), // Reduced from body2
+    color: TextColors.primary,
+    marginBottom: Spacing.sm,
+    fontWeight: '600',
+  },
+  requiredAsterisk: {
+    color: BrandColors.error,
+    fontWeight: 'bold',
+  },
+  childCard: {
+    backgroundColor: BackgroundColors.card,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.sm,
+    ...Shadow.small,
+  },
+  childHeader: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 15,
+    marginBottom: Spacing.sm,
+  },
+  childNumber: {
+    fontSize: moderateScale(14), // Reduced from h6
+    color: BrandColors.primary,
+    fontWeight: '600',
+  },
+  removeButton: {
+    backgroundColor: BrandColors.error,
+    width: moderateScale(24),
+    height: moderateScale(24),
+    borderRadius: BorderRadius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: moderateScale(36),
+    minHeight: moderateScale(36),
+  },
+  removeButtonText: {
+    color: TextColors.inverse,
+    fontSize: moderateScale(16),
+    fontWeight: 'bold',
+  },
+  childInputRow: {
+    flexDirection: DeviceType.isSmallPhone ? 'column' : 'row',
+    gap: Spacing.sm,
+    marginBottom: Spacing.sm,
+  },
+  nameInputContainer: {
+    flex: 1,
+  },
+  ageInputContainer: {
+    width: DeviceType.isSmallPhone ? '100%' : moderateScale(70),
+    minWidth: moderateScale(60),
   },
   childNameInput: {
-    flex: 1,
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    backgroundColor: 'white',
-  },
-  ageContainer: {
-    alignItems: 'center',
-  },
-  ageLabel: {
-    fontSize: 12,
-    color: '#333',
-    marginBottom: 5,
+    borderColor: NeutralColors.gray300,
+    borderRadius: BorderRadius.sm,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.sm,
+    fontSize: moderateScale(14),
+    backgroundColor: BackgroundColors.primary,
   },
   ageInput: {
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-    fontSize: 14,
-    width: 50,
+    borderColor: NeutralColors.gray300,
+    borderRadius: BorderRadius.sm,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.sm,
+    fontSize: moderateScale(14),
     textAlign: 'center',
-    backgroundColor: 'white',
+    backgroundColor: BackgroundColors.primary,
+  },
+  courseSection: {
+    marginTop: Spacing.sm,
+  },
+  courseSectionHeader: {
+    marginBottom: Spacing.sm,
+  },
+  courseOptions: {
+    flexDirection: 'column',
+    gap: Spacing.sm,
+  },
+  courseOptionContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    minHeight: moderateScale(45),
+  },
+  courseOption: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: NeutralColors.gray300,
+    borderRadius: BorderRadius.sm,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.sm,
+    backgroundColor: BackgroundColors.primary,
+    gap: Spacing.sm,
+    minHeight: moderateScale(40),
+  },
+  courseLogoSmall: {
+    width: moderateScale(24),
+    height: moderateScale(24),
+    resizeMode: 'contain',
+  },
+  courseOptionText: {
+    fontSize: moderateScale(14),
+    fontWeight: '600',
+    color: TextColors.primary,
+  },
+  courseOptionTextSelected: {
+    color: TextColors.inverse,
+  },
+  infoButton: {
+    width: moderateScale(24),
+    height: moderateScale(24),
+    borderRadius: moderateScale(12),
+    backgroundColor: BrandColors.info,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: moderateScale(36),
+    minHeight: moderateScale(36),
+  },
+  infoButtonText: {
+    color: TextColors.inverse,
+    fontSize: moderateScale(12),
+    fontWeight: 'bold',
+    fontStyle: 'italic',
+  },
+  addChildButton: {
+    borderWidth: 1,
+    borderColor: BrandColors.primary,
+    borderStyle: 'dashed',
+    borderRadius: BorderRadius.md,
+    paddingVertical: Spacing.sm,
+    alignItems: 'center',
+    backgroundColor: BackgroundColors.primary,
+  },
+  addChildButtonText: {
+    fontSize: moderateScale(14),
+    color: BrandColors.primary,
+    fontWeight: '600',
   },
   fullWidthInput: {
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    backgroundColor: 'white',
+    borderColor: NeutralColors.gray300,
+    borderRadius: BorderRadius.sm,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.sm,
+    fontSize: moderateScale(14),
+    backgroundColor: BackgroundColors.primary,
   },
   contactRow: {
-    flexDirection: 'row',
-    gap: 15,
+    flexDirection: 'column',
+    gap: Spacing.sm,
   },
   contactField: {
-    flex: 1,
+    width: '100%',
   },
   contactInput: {
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    backgroundColor: 'white',
+    borderColor: NeutralColors.gray300,
+    borderRadius: BorderRadius.sm,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.sm,
+    fontSize: moderateScale(14),
+    backgroundColor: BackgroundColors.primary,
+  },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: BackgroundColors.overlay,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.lg,
+  },
+  modalContent: {
+    backgroundColor: BackgroundColors.card,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.lg,
+    width: DeviceType.isTablet ? '80%' : '95%',
+    maxWidth: DeviceType.isTablet ? 500 : 400,
+    ...Shadow.large,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  modalTitle: {
+    ...Typography.h6,
+    color: TextColors.primary,
+  },
+  modalCloseButton: {
+    width: moderateScale(33), // 30 * 1.1 = 33, moderate responsive
+    height: moderateScale(33), // 30 * 1.1 = 33, moderate responsive
+    borderRadius: moderateScale(17), // 15 * 1.1 ≈ 17, moderate responsive
+    backgroundColor: NeutralColors.gray300,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: moderateScale(44), // Minimum touch target
+    minHeight: moderateScale(44), // Minimum touch target
+  },
+  modalCloseText: {
+    fontSize: moderateScale(20), // 18 * 1.1 ≈ 20, moderate responsive
+    fontWeight: 'bold',
+    color: TextColors.primary,
+  },
+  modalText: {
+    ...Typography.body1,
+    color: TextColors.primary,
+    lineHeight: 26, // Updated to match new Typography.body1 lineHeight
+    marginBottom: Spacing.lg,
+  },
+  modalButton: {
+    backgroundColor: BrandColors.primary,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md,
+    alignItems: 'center',
+  },
+  modalButtonText: {
+    ...Typography.button,
+    color: TextColors.inverse,
   },
   consentSection: {
-    marginBottom: 20,
+    backgroundColor: BackgroundColors.card,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.lg,
+    ...Shadow.small,
   },
   checkboxContainer: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 10,
+    gap: Spacing.sm,
   },
   checkbox: {
-    width: 20,
-    height: 20,
-    borderWidth: 2,
-    borderColor: '#2E7D32',
-    borderRadius: 3,
+    width: moderateScale(20),
+    height: moderateScale(20),
+    borderWidth: 1,
+    borderColor: BrandColors.primary,
+    borderRadius: BorderRadius.sm,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'white',
+    backgroundColor: BackgroundColors.primary,
     marginTop: 2,
+    minWidth: moderateScale(36),
+    minHeight: moderateScale(36),
   },
   checkboxChecked: {
-    backgroundColor: '#2E7D32',
+    backgroundColor: BrandColors.primary,
   },
   checkmark: {
-    color: 'white',
-    fontSize: 12,
+    color: TextColors.inverse,
+    fontSize: moderateScale(12),
     fontWeight: 'bold',
   },
   consentText: {
     flex: 1,
-    fontSize: 11,
-    color: '#333',
-    lineHeight: 16,
-  },
-  programSection: {
-    marginBottom: 20,
-  },
-  programCard: {
-    backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 15,
-    marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  programHeader: {
-    alignItems: 'center',
-  },
-  iMathsTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#e91e63',
-    marginBottom: 5,
-  },
-  ucmasHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 15,
-  },
-  ucmasLogo: {
-    backgroundColor: '#2E7D32',
-    borderRadius: 30,
-    width: 60,
-    height: 60,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  ucmasLogoText: {
-    color: '#FFD700',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  ucmasYears: {
-    color: 'white',
-    fontSize: 6,
-  },
-  ucmasEmpowering: {
-    color: 'white',
-    fontSize: 6,
-  },
-  ucmasMinds: {
-    color: 'white',
-    fontSize: 6,
-  },
-  ucmasInfo: {
-    flex: 1,
-  },
-  ucmasTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#d32f2f',
-  },
-  ucmasSubtitle: {
-    fontSize: 10,
-    color: '#666',
-    fontStyle: 'italic',
-  },
-  ucmasProgram: {
-    fontSize: 12,
-    color: '#333',
-    marginTop: 2,
-  },
-  codingTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#9c27b0',
-    marginBottom: 5,
-  },
-  programSubtitle: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 5,
-  },
-  ageRange: {
-    fontSize: 11,
-    color: '#333',
-    backgroundColor: '#f0f0f0',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
+    fontSize: moderateScale(12),
+    color: TextColors.primary,
+    lineHeight: 18,
   },
   submitButton: {
-    backgroundColor: '#2E7D32',
-    paddingVertical: 15,
-    borderRadius: 8,
+    backgroundColor: BrandColors.primary,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md,
     alignItems: 'center',
-    marginTop: 10,
+    ...Shadow.small,
   },
   submitButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: moderateScale(16),
+    color: TextColors.inverse,
+    fontWeight: '600',
   },
 });
