@@ -17,7 +17,7 @@ def lambda_handler(event, context):
     Expected event body:
     {
         "requestId": "uuid-string",
-        "otp": "123456"
+        "otp": "1234"
     }
     
     Returns:

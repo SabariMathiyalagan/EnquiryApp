@@ -63,7 +63,7 @@ export const requestOtp = async (phone: string): Promise<RequestOtpResponse> => 
  * Verify OTP code
  * @param requestId - The request ID from requestOtp
  * @param phone - Phone number in format XXX-XXX-XXXX
- * @param otp - 6-digit OTP code
+ * @param otp - 4-digit OTP code
  * @returns Promise with ok status
  */
 export const verifyOtp = async (

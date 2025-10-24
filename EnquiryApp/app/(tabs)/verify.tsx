@@ -27,7 +27,7 @@ import {
 } from '@/constants/theme';
 import { verifyOtp, submitEnquiry, requestOtp } from '@/app/api/api';
 
-const OTP_LENGTH = 6;
+const OTP_LENGTH = 4;
 const TIMER_DURATION = 300; // 5 minutes in seconds
 
 export default function VerifyScreen() {
@@ -137,15 +137,9 @@ export default function VerifyScreen() {
     
     // Validate OTP
     if (otpCode.length !== OTP_LENGTH) {
-      setError('Please enter the complete 6-digit code');
+      setError('Please enter the complete 4-digit code');
       return;
     }
-    
-    // DEBUG: Log what we're sending
-    console.log('DEBUG - OTP Array:', otp);
-    console.log('DEBUG - OTP Code:', otpCode);
-    console.log('DEBUG - Request ID:', requestId);
-    console.log('DEBUG - Phone:', phone);
     
     setIsVerifying(true);
     setError('');
@@ -273,7 +267,7 @@ export default function VerifyScreen() {
             <View style={styles.instructionsCard}>
               <Text style={styles.instructionsTitle}>Enter Verification Code</Text>
               <Text style={styles.instructionsText}>
-                We've sent a 6-digit code to {phone}. Please enter it below to verify your phone number.
+                We've sent a 4-digit code to {phone}. Please enter it below to verify your phone number.
               </Text>
             </View>
             

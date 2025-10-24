@@ -62,8 +62,8 @@ def lambda_handler(event, context):
                 'body': json.dumps({'error': 'Invalid phone format. Expected E.164 format (e.g., +11234567890)'})
             }
         
-        # Generate 6-digit OTP
-        otp_code = str(secrets.randbelow(1000000)).zfill(6)
+        # Generate 4-digit OTP
+        otp_code = str(secrets.randbelow(10000)).zfill(4)
         
         # Generate salt and hash
         salt = secrets.token_hex(16)
