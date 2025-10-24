@@ -11,14 +11,15 @@ import {
   Platform,
   Image,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
-import Svg, { Path, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { StatusBar } from 'expo-status-bar';
+import { useRouter } from 'expo-router';
 import { 
   BrandColors, 
   CourseColors, 
   NeutralColors, 
-  TextColors, 
+  TextColors,   
   BackgroundColors,
   Shadow,
   Spacing,
@@ -28,6 +29,7 @@ import {
   ContainerWidth,
   moderateScale
 } from '@/constants/theme';
+import { requestOtp } from '@/app/api/api';
 
 
 
@@ -55,6 +57,8 @@ interface FormData {
 }
 
 export default function EnquiryFormScreen() {
+  const router = useRouter();
+  
   const [formData, setFormData] = useState<FormData>({
     children: [{ id: '1', name: '', age: '', selectedCourse: '' }],
     parentName: '',
@@ -67,6 +71,7 @@ export default function EnquiryFormScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedCourseInfo, setSelectedCourseInfo] = useState<string>('');
   const [prevPhoneLength, setPrevPhoneLength] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const addChild = () => {
     if (formData.children.length < 5) {
@@ -128,7 +133,7 @@ export default function EnquiryFormScreen() {
     }));
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     // Enhanced validation
     const hasValidChild = formData.children.some(child => child.name.trim() && child.age.trim() && child.selectedCourse);
     
@@ -147,14 +152,41 @@ export default function EnquiryFormScreen() {
       return;
     }
     
+    // Validate phone number format (XXX-XXX-XXXX)
+    const phonePattern = /^\d{3}-\d{3}-\d{4}$/;
+    if (!phonePattern.test(formData.contactNumber)) {
+      Alert.alert('Validation Error', 'Please enter a valid phone number in format XXX-XXX-XXXX');
+      return;
+    }
+    
     if (!formData.consent) {
       Alert.alert('Validation Error', 'Please provide consent to continue');
       return;
     }
 
-    Alert.alert('Success', 'Enquiry submitted successfully!', [
-      { text: 'OK', onPress: () => console.log('Form submitted:', formData) }
-    ]);
+    // Request OTP
+    setIsSubmitting(true);
+    
+    try {
+      const response = await requestOtp(formData.contactNumber);
+      
+      // Navigate to verify page with requestId and formData
+      router.push({
+        pathname: './verify' as any,
+        params: {
+          requestId: response.requestId,
+          phone: formData.contactNumber,
+          formData: JSON.stringify(formData),
+        },
+      });
+    } catch (error: any) {
+      Alert.alert(
+        'Error',
+        error.message || 'Failed to send verification code. Please try again.'
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const getCourseColor = (course: string) => {
@@ -380,8 +412,19 @@ export default function EnquiryFormScreen() {
             </View>
 
             {/* Submit Button */}
-            <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-              <Text style={styles.submitButtonText}>Submit Enquiry</Text>
+            <TouchableOpacity 
+              style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]} 
+              onPress={handleSubmit}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <View style={styles.submitLoadingContainer}>
+                  <ActivityIndicator color={TextColors.inverse} />
+                  <Text style={styles.submitButtonText}>Sending Code...</Text>
+                </View>
+              ) : (
+                <Text style={styles.submitButtonText}>Submit Enquiry</Text>
+              )}
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -778,9 +821,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     ...Shadow.small,
   },
+  submitButtonDisabled: {
+    backgroundColor: NeutralColors.gray400,
+    opacity: 0.6,
+  },
   submitButtonText: {
     fontSize: moderateScale(16),
     color: TextColors.inverse,
     fontWeight: '600',
+  },
+  submitLoadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
   },
 });

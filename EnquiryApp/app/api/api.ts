@@ -1,102 +1,124 @@
-import { API_URL } from './config';
+import { API_URL, API_KEY } from './config';
 
-// Validate E.164 phone number format
-const isValidPhone = (phone: string): boolean => {
-  const e164Regex = /^\+[1-9]\d{1,14}$/;
-  return e164Regex.test(phone);
-};
+// Common headers for all API requests
+const getHeaders = () => ({
+  'Content-Type': 'application/json',
+  'x-api-key': API_KEY,
+});
 
-// Validate 6-digit OTP
-const isValidOtp = (otp: string): boolean => {
-  const otpRegex = /^\d{6}$/;
-  return otpRegex.test(otp);
-};
+// ===== API Response Types =====
 
-// Validate API_URL is set
-if (!API_URL) {
-  throw new Error('API_URL must be set in config.ts');
+export interface RequestOtpResponse {
+  requestId: string;
 }
 
+export interface VerifyOtpResponse {
+  ok: boolean;
+}
+
+export interface SubmitEnquiryResponse {
+  success: boolean;
+  enquiryId: string;
+}
+
+export interface ApiError {
+  error: string;
+}
+
+// ===== API Functions =====
+
 /**
- * Request OTP for phone number
- * @param phone - E.164 formatted phone number (+1234567890)
- * @param formData - Optional additional form data
+ * Request OTP for phone number verification
+ * @param phone - Phone number in format XXX-XXX-XXXX (will be converted to E.164 format)
  * @returns Promise with requestId
  */
-export async function requestOtp(phone: string, formData?: Record<string, any>): Promise<{ requestId: string }> {
-  if (!isValidPhone(phone)) {
-    throw new Error('Invalid phone format. Must be E.164 format (+1234567890)');
-  }
-
+export const requestOtp = async (phone: string): Promise<RequestOtpResponse> => {
   try {
-    const response = await fetch(`${API_URL}/request-otp`, {
+    // Convert phone format from XXX-XXX-XXXX to +1XXXXXXXXXX
+    const cleanPhone = phone.replace(/[-\s]/g, '');
+    const e164Phone = `+1${cleanPhone}`;
+
+    const response = await fetch(`${API_URL}/request`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: getHeaders(),
       body: JSON.stringify({
-        phone,
-        formData: formData || {},
+        phone: e164Phone,
       }),
     });
 
+    const data = await response.json();
+
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || 'Failed to request OTP');
+      throw new Error(data.error || 'Failed to request OTP');
     }
 
-    return await response.json();
+    return data;
   } catch (error) {
-    if (error instanceof Error) {
-      throw error;
-    }
-    throw new Error('Network error occurred');
+    console.error('Request OTP error:', error);
+    throw error;
   }
-}
+};
 
 /**
- * Verify OTP with requestId and phone
- * @param requestId - UUID from requestOtp response
- * @param phone - E.164 formatted phone number
+ * Verify OTP code
+ * @param requestId - The request ID from requestOtp
+ * @param phone - Phone number in format XXX-XXX-XXXX
  * @param otp - 6-digit OTP code
- * @returns Promise with success status
+ * @returns Promise with ok status
  */
-export async function verifyOtp(requestId: string, phone: string, otp: string): Promise<{ ok: true }> {
-  if (!isValidPhone(phone)) {
-    throw new Error('Invalid phone format. Must be E.164 format (+1234567890)');
-  }
-
-  if (!isValidOtp(otp)) {
-    throw new Error('Invalid OTP format. Must be 6 digits');
-  }
-
-  if (!requestId) {
-    throw new Error('RequestId is required');
-  }
-
+export const verifyOtp = async (
+  requestId: string,
+  otp: string
+): Promise<VerifyOtpResponse> => {
   try {
-    const response = await fetch(`${API_URL}/verify-otp`, {
+    const requestBody = {
+      requestId,
+      otp,
+    };
+    
+    console.log('API - Sending verify request:', requestBody);
+    
+    const response = await fetch(`${API_URL}/verify`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        requestId,
-        phone,
-        otp,
-      }),
+      headers: getHeaders(),
+      body: JSON.stringify(requestBody),
     });
 
+    const data = await response.json();
+
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || 'Failed to verify OTP');
+      throw new Error(data.error || 'Failed to verify OTP');
     }
 
-    return await response.json();
+    return data;
   } catch (error) {
-    if (error instanceof Error) {
-      throw error;
-    }
-    throw new Error('Network error occurred');
+    console.error('Verify OTP error:', error);
+    throw error;
   }
-}
+};
+
+/**
+ * Submit enquiry form data
+ * @param formData - Complete form data object
+ * @returns Promise with success status and enquiryId
+ */
+export const submitEnquiry = async (formData: any): Promise<SubmitEnquiryResponse> => {
+  try {
+    const response = await fetch(`${API_URL}/submit`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(formData),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to submit enquiry');
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Submit enquiry error:', error);
+    throw error;
+  }
+};

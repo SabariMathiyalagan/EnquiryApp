@@ -13,6 +13,12 @@ export default function TabLayout() {
           title: 'Enquiry Form',
         }}
       />
+      <Stack.Screen
+        name="verify"
+        options={{
+          title: 'Verify Phone',
+        }}
+      />
     </Stack>
   );
 }
