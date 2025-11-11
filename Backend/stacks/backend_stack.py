@@ -8,13 +8,37 @@ from aws_cdk import (
     RemovalPolicy,
     aws_sns as sns,
     aws_iam as iam,
+    aws_secretsmanager as secretsmanager,
+    BundlingOptions,
 )
 from constructs import Construct
+import os
+from pathlib import Path
+from dotenv import load_dotenv
 
+# Load .env file from Backend root directory
+env_path = Path(__file__).parent.parent / '.env'
+load_dotenv(dotenv_path=env_path)
 class BackendStack(Stack):
 
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
+
+        # Get environment variables with validation
+        google_sheet_secret_name = os.getenv("GOOGLE_SHEET_SECRET_NAME")
+        sheet_id = os.getenv("SHEET_ID")
+        
+        # Validate required environment variables
+        if not google_sheet_secret_name:
+            raise ValueError("GOOGLE_SHEET_SECRET_NAME environment variable must be set")
+        if not sheet_id:
+            raise ValueError("SHEET_ID environment variable must be set")
+        
+        google_sheets_secret = secretsmanager.Secret.from_secret_name_v2(
+            self, 
+            id="GoogleSheetsSecret", 
+            secret_name=google_sheet_secret_name
+        )
 
         otp_table = ddb.Table(
             self, "OtpTable",
@@ -22,7 +46,7 @@ class BackendStack(Stack):
             removal_policy=RemovalPolicy.DESTROY,
             time_to_live_attribute="TTL",
             billing_mode=ddb.BillingMode.PAY_PER_REQUEST,
-            point_in_time_recovery=True,
+            point_in_time_recovery_specification=ddb.PointInTimeRecoverySpecification(point_in_time_recovery_enabled=True),
             table_name="OtpTable",
         )
 
@@ -32,7 +56,7 @@ class BackendStack(Stack):
             removal_policy=RemovalPolicy.DESTROY,
             time_to_live_attribute="TTL",
             billing_mode=ddb.BillingMode.PAY_PER_REQUEST,
-            point_in_time_recovery=True,
+            point_in_time_recovery_specification=ddb.PointInTimeRecoverySpecification(point_in_time_recovery_enabled=True),
             table_name="EnquiryTable",
         )
         common_env = {
@@ -64,9 +88,22 @@ class BackendStack(Stack):
             function_name="SubmitEnquiryLambda",
             runtime=lambda_.Runtime.PYTHON_3_12,
             handler="submit_enquiry_handler.lambda_handler",
-            code=lambda_.Code.from_asset("./lambda_functions"),
-            environment=common_env,
+            code=lambda_.Code.from_asset(
+                path="./lambda_functions",
+                bundling=BundlingOptions(
+                    image=lambda_.Runtime.PYTHON_3_12.bundling_image,
+                    command=[
+                        'bash', '-c',
+                        'pip install -r requirements.txt -t /asset-output && cp -r . /asset-output'
+                    ],
+                )
+            ),
+            environment={**common_env,
+                "SHEET_ID": sheet_id,
+                "GOOGLE_SHEETS_SECRET": google_sheet_secret_name,
+            },
         )
+        google_sheets_secret.grant_read(submit_enquiry_lambda)
         api_gateway = apigw.RestApi(
             self, "BackendApiGateway",
             rest_api_name="BackendApiGateway",
