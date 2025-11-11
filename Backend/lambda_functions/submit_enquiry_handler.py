@@ -4,12 +4,16 @@ import uuid
 import os
 from datetime import datetime, timezone
 from decimal import Decimal
+import gspread
+
 
 # Initialize AWS clients
 dynamodb = boto3.resource('dynamodb')
 
 # Environment variables
 ENQUIRY_TABLE = os.environ.get('ENQUIRY_TABLE')
+
+_cached_client = None
 
 def lambda_handler(event, context):
     """
@@ -38,6 +42,16 @@ def lambda_handler(event, context):
         "enquiryId": "uuid-string"
     }
     """
+
+    def get_gspread_client():
+        global _cached_client
+        if _cached_client is None:
+            response = boto3.client('secretsmanager').get_secret_value(SecretId=os.environ.get('GOOGLE_SHEETS_SECRET'))
+            secret_dict = json.loads(response['SecretString'])
+            _cached_client = gspread.service_account_from_dict(
+            info=secret_dict
+        )
+        return _cached_client
     
     # CORS headers
     headers = {
@@ -122,7 +136,38 @@ def lambda_handler(event, context):
         # Store in DynamoDB
         table = dynamodb.Table(ENQUIRY_TABLE)
         
+        # Format children data for Google Sheets (as JSON string or concatenated)
+        children_info = " | ".join([
+            f"{child.get('name', 'N/A')} (Age: {child.get('age', 'N/A')}, Course: {child.get('selectedCourse', 'N/A')})"
+            for child in children
+        ])
+        
         try:
+            # Write to Google Sheets
+            try:
+                client = get_gspread_client()
+                sheet = client.open_by_key(os.environ.get('SHEET_ID'))
+                worksheet = sheet.worksheet('Sheet1')
+                
+                # Append row with all data including children info
+                worksheet.append_row([
+                    enquiry_id,
+                    parent_name,
+                    contact_number,
+                    email if email else '',
+                    str(consent),
+                    todays_date,
+                    children_info,  # Add children information
+                    submitted_at,
+                    'pending'
+                ])
+                print(f"Successfully wrote to Google Sheets: {enquiry_id}")
+            except Exception as sheets_error:
+                # Log error but don't fail the request - DynamoDB is the source of truth
+                print(f"Google Sheets write error: {str(sheets_error)}")
+                print("Continuing with DynamoDB storage...")
+            
+            # Write to DynamoDB (primary storage)
             table.put_item(
                 Item={
                     'PK': f'ENQUIRY#{enquiry_id}',
@@ -137,6 +182,7 @@ def lambda_handler(event, context):
                     'status': 'pending'
                 }
             )
+            print(f"Successfully wrote to DynamoDB: {enquiry_id}")
         except Exception as e:
             print(f"DynamoDB put error: {str(e)}")
             return {
