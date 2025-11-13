@@ -242,17 +242,19 @@ export default function EnquiryFormScreen() {
         style={styles.keyboardView}
       >
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-          {/* Header - Matching Original Form */}
+        
           <View style={styles.header}>
             <View style={styles.headerContent}>
               <Text style={styles.headerTitle}>ENQUIRY FORM</Text>
             </View>
+            {/* Date Container 
             <View style={styles.dateContainer}>
               <Text style={styles.dateLabel}>Today's Date</Text>
               <View style={styles.dateBox}>
                 <Text style={styles.dateText}>{formData.todaysDate}</Text>
               </View>
-            </View>
+           
+            </View>*/ }
           </View>
 
           {/* Main Form */}
@@ -485,7 +487,7 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: BrandColors.primary,
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
+    paddingVertical: Spacing.lg,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',

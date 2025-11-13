@@ -47,9 +47,9 @@ export const BrandColors = {
 
 // Course Colors - Matching Original Form
 export const CourseColors = {
-  imaths: '#E91E63',       // Pink for i-Maths (from original)
+  imaths: '#9C27B0',       // Pink for i-Maths (from original)
   ucmas: '#2E7D32',        // Green for UCMAS (from original)
-  obotz: '#9C27B0',        // Purple for OBOTZ (from original)
+  obotz: '#ff7400',        // Purple for OBOTZ (from original)
 };
 
 // Neutral Colors - Matching Original Form
